@@ -116,6 +116,10 @@ class Todo:
 
     # Marks and unmark the task as done
     def done(self, user_input=input):
+        if not self.todo_list_file:
+            print("Your to-do list is empty.")
+            return
+
         while True:
             # ANSI codes for crossing out the text
             STRIKETHROUGH = "\x1b[9m"
@@ -124,6 +128,7 @@ class Todo:
             number_of_tasks = 0
 
             print("""Which task you want to mark/unmark as done?
+Type "back" to go back.
 ----------------------------------------------""")
             for number, task in enumerate(self.todo_list_file):
                 print(f"{number + 1} - {task["Task"]}")
@@ -132,9 +137,12 @@ class Todo:
             done_option: str = user_input(
                 """----------------------------------------------
 Type the number of the desire task: """
-            ).strip()
+            ).strip().lower()
 
-            if not done_option.isdecimal():
+            if done_option == "back":
+                break
+
+            elif not done_option.isdecimal():
                 print(f"\nEnter a valid number between 1 and {number_of_tasks}\n")
                 continue
 
@@ -156,7 +164,8 @@ Type the number of the desire task: """
                         r"^.\[9m(.*).\[0m$",
                         self.todo_list_file[int(done_option) - 1][key],
                     )
-                    self.todo_list_file[done_option - 1][key] = f"{key_match.group(1)}"
+                    if key_match:
+                        self.todo_list_file[done_option - 1][key] = f"{key_match.group(1)}"
 
                 # Changing status
                 self.todo_list_file[done_option - 1]["Status"] = "incomplete"
@@ -180,11 +189,18 @@ Type the number of the desire task: """
             break
 
     def edit(self, user_input=input):
+        if not self.todo_list_file:
+            print("Your to-do list is empty.")
+            return
+
         while True:
+            STRIKETHROUGH = "\x1b[9m"
+            RESET = "\x1b[0m"
 
             number_of_tasks = 0
 
             print("""Which task you want to edit?
+Type "back" to go back.
 ----------------------------------------------""")
             for number, task in enumerate(self.todo_list_file):
                 print(f"{number + 1} - {task["Task"]}")
@@ -193,9 +209,12 @@ Type the number of the desire task: """
             edit_option_main: str = user_input(
                 """----------------------------------------------
 Type the number of the desire task: """
-            ).strip()
+            ).strip().lower()
 
-            if not edit_option_main.isdecimal():
+            if edit_option_main == "back":
+                break
+
+            elif not edit_option_main.isdecimal():
                 print(f"\nEnter a valid number between 1 and {number_of_tasks}\n")
                 continue
 
@@ -227,6 +246,9 @@ Type the number of the desire task: """
                                 else:
                                     print("Please enter an integer (1-10)")
 
+                            if self.todo_list_file[edit_option_main - 1]["Status"] == "done":
+                                edit_priority = f"{STRIKETHROUGH}{edit_priority}{RESET}"
+
                             self.todo_list_file[edit_option_main - 1][
                                 "Priority"
                             ] = edit_priority
@@ -234,8 +256,6 @@ Type the number of the desire task: """
                             self.save()
 
                         case "task":
-                            STRIKETHROUGH = "\x1b[9m"
-                            RESET = "\x1b[0m"
                             if edit_task := re.search(
                                 r"^.\[9m(.*).\[0m$",
                                 self.todo_list_file[edit_option_main - 1]["Task"],
@@ -275,6 +295,9 @@ Type the number of the desire task: """
                                     print("Wrong format. Try again.")
                                     continue
 
+                            if self.todo_list_file[edit_option_main - 1]["Status"] == "done":
+                                edit_due_date_input = f"{STRIKETHROUGH}{edit_due_date_input}{RESET}"
+
                             self.todo_list_file[edit_option_main - 1][
                                 "Due Date"
                             ] = edit_due_date_input
@@ -292,6 +315,10 @@ Type the number of the desire task: """
 
     # Deletes one task form the list
     def delete(self, user_input=input):
+        if not self.todo_list_file:
+            print("Your to-do list is empty.")
+            return
+
         while True:
             number_of_tasks = 0
             print("""Which task you want to delete?
@@ -575,7 +602,8 @@ def gen(todo_list, user_input=input):
                         personal_commitments_reader
                     )
 
-        gen_edit(personal_commitments, PROMPT_SCHEDULE)
+        if gen_edit(personal_commitments, PROMPT_SCHEDULE, user_input) == 0:
+            return
 
         break
 
@@ -609,7 +637,8 @@ def gen(todo_list, user_input=input):
 
                 to_prompt = f"{PROMPT_SCHEDULE}\n{modification}"
 
-                gen_edit(personal_commitments, to_prompt)
+                if gen_edit(personal_commitments, to_prompt, user_input) == 0:
+                    return
 
                 schedule_data = []
 
@@ -640,7 +669,7 @@ def gen(todo_list, user_input=input):
 
 
 # Uses gemini to generate the schedule and writes it into a file
-def gen_edit(personal_commitments, to_prompt):
+def gen_edit(personal_commitments, to_prompt, user_input=input):
     while True:
         with open("gemini_api_key.txt", "a+", newline="") as gemini_api_key:
             gemini_api_key.seek(0)
@@ -652,9 +681,13 @@ def gen_edit(personal_commitments, to_prompt):
         except IndexError:
             GEMINI_API_KEY = "null"
 
-        result = requests.get(
-            f"https://generativelanguage.googleapis.com/v1/models?key={GEMINI_API_KEY}"
-        )
+        try:
+            result = requests.get(
+                f"https://generativelanguage.googleapis.com/v1/models?key={GEMINI_API_KEY}"
+            )
+        except:
+            print("Could not connect to Gemini. Check your connection and try again.")
+            return 0
 
         if str(result) == "<Response [200]>":
             print("\nThis may take few minutes. Please wait...")
@@ -663,12 +696,15 @@ def gen_edit(personal_commitments, to_prompt):
         else:
             print("\nNo valid API.")
 
-            with open("gemini_api_key.txt", "w", newline="") as gemini_api_key:
-                GEMINI_API_KEY = input(
-                    "What is your API key for gemini-3-flash-preview?: "
-                )
+            GEMINI_API_KEY = user_input(
+                'What is your API key for gemini-3.5-flash-lite? (type "back" to go back): '
+            ).strip()
 
-                gemini_api_key.write(GEMINI_API_KEY.strip())
+            if GEMINI_API_KEY.lower() == "back":
+                return 0
+
+            with open("gemini_api_key.txt", "w", newline="") as gemini_api_key:
+                gemini_api_key.write(GEMINI_API_KEY)
             continue
 
     client = genai.Client(api_key=GEMINI_API_KEY)
@@ -677,7 +713,7 @@ def gen_edit(personal_commitments, to_prompt):
         try:
             prompt = to_prompt
             response = client.models.generate_content(
-                model="gemini-3-flash-preview",
+                model="gemini-3.5-flash-lite",
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_INSTRUCTIONS_SCHEDULE
                 ),
@@ -692,14 +728,18 @@ def gen_edit(personal_commitments, to_prompt):
 
             schedule = response.text
 
+            if not schedule or not schedule.strip():
+                print("Gemini returned an empty schedule. Try again later.")
+                return 0
+
             with open("schedule.txt", "w", newline="") as schedule_file:
                 schedule_file.write(schedule)
 
             break
 
         except:
-            # continue
-            ...
+            print("Gemini could not generate the schedule. Try again later.")
+            return 0
 
 
 if __name__ == "__main__":

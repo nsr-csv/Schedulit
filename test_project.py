@@ -44,15 +44,15 @@ def test_todo_done():
 
     todo(todo_list_test, inputs)
 
-    if re.search(r"^.\[9(.*).\[0m$", todo_list_test.todo_list_file[0]["Task"]):
-        assert True
+    assert re.search(r"^.\[9m(.*).\[0m$", todo_list_test.todo_list_file[0]["Task"])
+    assert todo_list_test.todo_list_file[0]["Status"] == "done"
 
     options_and_input = iter(["done", "1", "back", "exit"])
 
     todo(todo_list_test, inputs)
 
-    if not re.search(r"^.\[9(.*).\[0m$", todo_list_test.todo_list_file[0]["Task"]):
-        assert True
+    assert not re.search(r"^.\[9m(.*).\[0m$", todo_list_test.todo_list_file[0]["Task"])
+    assert todo_list_test.todo_list_file[0]["Status"] == "incomplete"
 
 
 def test_todo_edit():
@@ -151,3 +151,89 @@ def test_gen_edit():
         final_schedule_edited = file.readlines()
 
     assert final_schedule != final_schedule_edited
+
+
+def test_todo_completed_priority_edit_and_reopen():
+    options_and_input = iter([
+        "clear", "yes", "add", "TEST", "01/01/2027", "8",
+        "done", "1", "edit", "1", "priority", "5", "back", "exit",
+    ])
+
+    def inputs(_):
+        return next(options_and_input)
+
+    todo(todo_list_test, inputs)
+    assert todo_list_test.todo_list_file[0]["Priority"] == "\x1b[9m5\x1b[0m"
+    assert todo_list_test.todo_list_file[0]["Status"] == "done"
+
+    options_and_input = iter(["done", "1", "exit"])
+    todo(todo_list_test, inputs)
+    assert todo_list_test.todo_list_file[0] == {
+        "Priority": "5", "Task": "TEST", "Due Date": "01/01/2027",
+        "Status": "incomplete",
+    }
+
+
+def test_todo_completed_date_edit_and_reopen():
+    options_and_input = iter([
+        "clear", "yes", "add", "TEST", "01/01/2027", "8",
+        "done", "1", "edit", "1", "due date", "02/01/2027", "back", "exit",
+    ])
+
+    def inputs(_):
+        return next(options_and_input)
+
+    todo(todo_list_test, inputs)
+    assert todo_list_test.todo_list_file[0]["Due Date"] == "\x1b[9m02/01/2027\x1b[0m"
+    assert todo_list_test.todo_list_file[0]["Status"] == "done"
+
+    options_and_input = iter(["done", "1", "exit"])
+    todo(todo_list_test, inputs)
+    assert todo_list_test.todo_list_file[0] == {
+        "Priority": "8", "Task": "TEST", "Due Date": "02/01/2027",
+        "Status": "incomplete",
+    }
+
+
+def test_todo_empty_options():
+    options_and_input = iter(["clear", "yes", "done", "edit", "del", "exit"])
+
+    def inputs(_):
+        return next(options_and_input)
+
+    todo(todo_list_test, inputs)
+    assert todo_list_test.todo_list_file == []
+
+
+def test_todo_back_from_selection():
+    options_and_input = iter([
+        "clear", "yes", "add", "TEST", "01/01/2027", "8",
+        "done", "BACK", "edit", "BACK", "del", "BACK", "exit",
+    ])
+
+    def inputs(_):
+        return next(options_and_input)
+
+    todo(todo_list_test, inputs)
+    assert todo_list_test.todo_list_file[0] == {
+        "Priority": "8", "Task": "TEST", "Due Date": "01/01/2027",
+        "Status": "incomplete",
+    }
+
+
+def test_todo_reopen_old_edited_task():
+    todo_list_test.todo_list_file = [{
+        "Priority": "5", "Task": "\x1b[9mTEST\x1b[0m",
+        "Due Date": "02/01/2027", "Status": "done",
+    }]
+    todo_list_test.save()
+    options_and_input = iter(["done", "1", "exit"])
+
+    def inputs(_):
+        return next(options_and_input)
+
+    todo(todo_list_test, inputs)
+    assert todo_list_test.todo_list_file[0] == {
+        "Priority": "5", "Task": "TEST", "Due Date": "02/01/2027",
+        "Status": "incomplete",
+    }

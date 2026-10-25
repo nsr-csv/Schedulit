@@ -1,0 +1,6 @@
+Fictional commitments for testing Schedulit.
+
+Monday and Wednesday: class from 10:00 AM to 11:00 AM.
+Tuesday and Thursday: work from 2:00 PM to 4:00 PM.
+Every day: sleep from 11:00 PM to 7:00 AM.
+Leave time for meals and breaks.
